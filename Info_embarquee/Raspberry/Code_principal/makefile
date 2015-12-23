@@ -1,5 +1,8 @@
 all: CodeCDF
 
+Pince: listechaine.o arduinoserial.o pince.o
+	gcc -o Pince pince.o arduinoserial.o listechaine.o -Wall -lm -lwiringPi
+
 CodeCDF: libodo.o listechaine.o arduinoserial.o main.o 
 	gcc -o CodeCDF main.o libodo.o arduinoserial.o listechaine.o -Wall -lm -lwiringPi
 

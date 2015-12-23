@@ -154,13 +154,13 @@ float serialGetfloat(int fd)
 		c=serialGetchar(fd);
 		if (c!='\n')
 			buffer[i]=c;
-		printf("%c\n",c);
+		//printf("%c\n",c);
 		delay(5);
 		i++;
 	}
 
  	float value=atof(buffer);
- 	printf("Float: %f\n",value);
+ 	//printf("Float: %f\n",value);
  	return value;
 }
 
