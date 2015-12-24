@@ -274,18 +274,20 @@ void debug_parcours()
 // Interruption de départ: le robot peut commencer le parcours
 ////
 
+
 void start()
 {
 	activate = 1;
 	printf("Début du parcours\n");
 }
-
+/*
 void stop()
 {
 	activate = 0;
 	printf("Temps écoulé !\n");
 	//Détacher les interruptions, activer parasol
 }
+*/
 
 ////
 // Calcul des déplacements
@@ -319,12 +321,12 @@ int main(void)
 
 	//---------------- Configuration Interuptions
 
+	system("gpio edge 29 falling");
 	
 	if (wiringPiISR(PINITSTART, INT_EDGE_FALLING, &start)<0){printf("Unable to setup interruption\n");exit(1);}
 	else{printf("Interrupt setup\n");}
 
-	digitalWrite(PINITSTART,1);
-
+    pullUpDnControl (PINITSTART, PUD_UP);
 
 
 	//---------------- Configuration série
@@ -375,8 +377,10 @@ int main(void)
 	}
 	*/
 
+	printf("Attente du signal de dépat...\n");
 	//Tq pas d'interruption de départ
-	//while(activate==0){delay(1);}
+	while(activate==0){delay(1);}
+	printf("C'est parti !\n");
 	activate=1;
 	//LED Running
 
