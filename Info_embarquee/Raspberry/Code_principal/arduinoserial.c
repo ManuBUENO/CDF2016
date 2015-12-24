@@ -78,6 +78,7 @@ void RX1()
     int cmd=0;
     char c=0;
     int i=0;
+    while(serialDataAvail(fd_A1)<1){}
     while(c!='\n')
     {
         c=serialGetchar(fd_A1);
@@ -97,6 +98,7 @@ void RX2()
     int cmd=0;
     char c=0;
     int i=0;
+    while(serialDataAvail(fd_A2)<1){}
     while(c!='\n')
     {
         c=serialGetchar(fd_A2);
