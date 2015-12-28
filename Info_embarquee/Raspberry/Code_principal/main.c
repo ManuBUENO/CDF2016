@@ -23,7 +23,7 @@ A faire:
 - Définir une structure de données pour chaque étape du robot (position à atteindre, pince, etc..)				OK
 - Faire des librairies (notamment pour les listes_chainées)														OK
 - Faire un MakeFile pour compliler proprement																	OK
-- Lecture des fichiers contenant les étapes du ROBOT    !!!!!!! Temriner parcours par 'f' !!!!!!!!!        		En cours													
+- Lecture des fichiers contenant les étapes du ROBOT    										        		OK												
 - Selection de la bonne disposition de la piste																	En cours
     (un bouton par dispo? Un bouton qui switche les dispos, avec un afficheur? D'autres idées ?)				
 - Boucle principale																								En cours
@@ -50,9 +50,9 @@ Codeuse droite:
     Signal A: GPIO 2
     Signal B: GPIO 3
 
-LED Init: GPIO 4
-LED Ready: GPIO 5
-LED Running: GPIO 6
+LED Init: GPIO 21
+LED Ready: GPIO 22
+LED Running: GPIO 23
 
 
 
@@ -79,21 +79,18 @@ LED Running: GPIO 6
 	 
 
 
-add -lwiringPi when compiling
-
-Library WiringPi:
-Must be installed on Raspberry Pi, see:
+Installer la librairie WiringPi !!
 
 https://projects.drogon.net/raspberry-pi/wiringpi/
 
 Usefull for GPIOs, Interrupt, Serial, Timing
 
-Complation avec le makefile (commande make)
+Complation: avec le makefile (commande make)
 */
 
 
 ////
-// Include files
+// Include libs
 ////
 #include <math.h>
 #include <stdio.h>
@@ -125,9 +122,9 @@ Complation avec le makefile (commande make)
 #define 		PINDA					2
 #define 		PINDB					3
 
-#define 		PINLEDA					21
-#define			PINLEDB 				22
-#define			PINLEDC					23
+#define 		PINLEDINIT				21
+#define			PINLEDREADY				22
+#define			PINLEDRUNNING			23
 #define			PINITSTART				29
 #define         PINSELECT               24
 #define         PINVALID                25
@@ -153,14 +150,15 @@ volatile int N_steps;
 //(position à atteindre, Etat capteurs, Commandes pince, delays, etc..)
 typedef struct etape
 {
-	//Mode 	1: X,Y,Va,Vd, capteurs 
-	//		2: angle, Va, capteurs
-	//		3: bras, capteurs
-	//		4: wait,capteur 
-	// espaces entre param, \n fin etape
+	//Mode 	0: Xdest,Ydest,Va,Vd, capteurs  (destination XY, Vitesse angulaire Va, vitesse rectiligne Vd, état des capteurs)
+	//		1: angle, Va, capteurs 			(angle à effectuer, Vitesse angulaire Va, état des capteurs)
+	//		2: bras, capteurs 				(Position des servomoteurs de la pince, état des capteurs)
+	//		3: wait,capteur 				(Temps wait de pause en ms)
+
+	//Strucure du fichier:
+	// mode en début de ligne puis paramètres éspacés par un espace simple, retour à la ligne pour étape suivante
 	
 	char mode;
-	//Position à atteindre
 	int X;					//(mm)
 	int Y;					//(mm)
 	float angle;				//(radian)
@@ -274,7 +272,7 @@ void debug_parcours()
 // Interruption de départ: le robot peut commencer le parcours
 ////
 
-
+// Cette fonction est appellée lors d'un front montant sur le pin PINITSTART (voir #defines)
 void start()
 {
 	activate = 1;
@@ -293,10 +291,13 @@ void stop()
 // Calcul des déplacements
 ////
 
+//Calcul de la consine en angle à envoyer à l'arduino à partir de la position actuelle (OX,OY) et la destination (Xdest, Ydest)
 float calcul_angle(float Xdest, float Ydest)
 {
 	return (180/PI)*(atan((Ydest - OY)/(Xdest - OX)) - Oangle);
 }
+
+//Calcul de la consine en distance à envoyer à l'arduino à partir de la position actuelle (OX,OY) et la destination (Xdest, Ydest)
 
 float calcul_distance(float Xdest, float Ydest)
 {
@@ -313,6 +314,8 @@ float calcul_distance(float Xdest, float Ydest)
 int main(void)
 {
 	//LEDs: Init, Ready, Running
+	//Allumage de la led d'état Init: Le programme a été lancé, le système s'initialise
+	digitalWrite(PINLEDINIT,HIGH);
 
 	//---------------- Configuration WiringPi
 
@@ -321,7 +324,6 @@ int main(void)
 
 	//---------------- Configuration Interuptions
 
-	system("gpio edge 29 falling");
 	
 	if (wiringPiISR(PINITSTART, INT_EDGE_FALLING, &start)<0){printf("Unable to setup interruption\n");exit(1);}
 	else{printf("Interrupt setup\n");}
@@ -335,9 +337,6 @@ int main(void)
 	if (Connect_Ardus(BAUDRATE) < 0)
 		printf("Unable to connect to Arduinos\n");
 	
-	//Debug Close Serial
-	//serialClose(fd_A1);
-	//serialClose(fd_A2);
 
 
 	//---------------- Configuration Odométrie
@@ -356,9 +355,9 @@ int main(void)
 	//fonction de lecture dans un fichier à faire
 
 	lecture_parcours();
-	printf("\nLu\n");
+	//printf("\nLu\n");
 	debug_parcours();
-	printf("\nEcrit\n");
+	//printf("\nEcrit\n");
 	
 
 	//---------------- Variables
@@ -376,29 +375,30 @@ int main(void)
 		delay(100);
 	}
 	*/
-
+	//Allumage de la led d'état READY: Le système est initialisé sans erreurs
+	digitalWrite(PINLEDREADY,HIGH);
 	printf("Attente du signal de dépat...\n");
 	//Tq pas d'interruption de départ
 	while(activate==0){delay(1);}
+	//Allumage de la led d'état RUNNING: Le parcours est en cours
+	digitalWrite(PINLEDREADY,HIGH);
 	printf("C'est parti !\n");
 	activate=1;
-	//LED Running
-
 
 	//---------------- Boucle principale
 	while ((activate==1) && (num<=N_steps))
 	{
 		printf("Etape %d\n",num);
 		printf("mode:%c\n",step[num].mode);
+
 		switch (step[num].mode)
 		{
-			//On set les capteurs, le fait-on même pour les bras et un wait ? ou les met-on automatiquement à 0?
-			//set_capteurs(step[num].capteurs,fd_A2);
 			//aller en X,Y
 			case '0':
                 i=0;reponse=-1;
                 while(i<3 && reponse!=2)
                 {
+                	//set_capteurs(step[num].capteurs,fd_A2);
                 	printf("Tentative angle %d\n",i);
                     reponse = dep_angle(calcul_angle(step[num].X,step[num].Y),step[num].Va,fd_A1);
                     // Est ce qu'on considère les obstacles en déplacement angulaire ?
@@ -413,6 +413,7 @@ int main(void)
                 i=0;reponse=-1;
                 while(i<3 && reponse!=2)
                 {
+                	//set_capteurs(step[num].capteurs,fd_A2);
                 	printf("Tentative dist %d\n",i);
                     reponse = dep_distance(calcul_distance(step[num].X,step[num].Y),step[num].Vd,fd_A1);
                     printf("Reponse: %d\n\n",reponse);
@@ -425,11 +426,12 @@ int main(void)
                 }
 			break;
             
-            //Se positionner à l'angle specifié
+            //Déplacement angulaire
 			case '1':
                 i=0;reponse=-1;
                 while(i<3 && reponse!=2)
                 {
+                	//set_capteurs(step[num].capteurs,fd_A2);
                     reponse = dep_angle(step[num].angle-Oangle,step[num].Va,fd_A1);
                     // Est ce qu'on considère les obstacles en déplacement angulaire ?
                     if (reponse==0)
@@ -454,6 +456,10 @@ int main(void)
 	}
 
 	printf("Fin du parcours\n");
+	digitalWrite(PINLEDINIT,LOW);
+	digitalWrite(PINLEDREADY,LOW);
+	digitalWrite(PINLEDRUNNING,LOW);
+
 	//sup_liste(&etape);
 	serialClose(fd_A1);
 	serialClose(fd_A2);
