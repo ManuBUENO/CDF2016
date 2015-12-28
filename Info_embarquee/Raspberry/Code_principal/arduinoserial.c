@@ -5,24 +5,23 @@ Commandes Rasp -> Ardu1 (asservissement)
 - "distance\nDV": demande un deplacement rectiligne avec D:distance (float,cm) et V:vitesse (float,cm/s)  
 - "stop\n": demande au robot de s'immobiliser
 
-Commandes Rasp -> Ardu2 (capteurs, servos)
-- "I\n": demande l'id de l'ardu
-- "capteurs\nC": set les capteurs avec C: byte (ou char) avec les 4 bits de poids faible: états des capteurs (0000xxxx)
-- "servos\nAAAAAAAA": bouge la pince avec A:angle d'un servo (float,deg)
-
 Commandes Ardu1 -> Rasp
 -"Ix": donne l'ID demandée x
 -"success\n": le déplacement est un succès
 -"bloque\n": le robot est bloqué 
 -"timeout\n": le robot a mis trop de temps pour faire son déplacement, abandon
 
+
+
+Commandes Rasp -> Ardu2 (capteurs, servos)
+- "I\n": demande l'id de l'ardu
+- "capteurs\nC": set les capteurs avec C: byte (ou char) avec les 4 bits de poids faible: états des capteurs (0000xxxx)
+- "servos\nAAAAAAAA": bouge la pince avec A:angle d'un servo (float,deg)
+
 Commandes Ardu2 -> Rasp
 -"Ix": donne l'ID demandée x
 -"obstacle": Obstacle rencontré
 -"libre": La voie est libre
-
-
-
 
 */
 
@@ -58,26 +57,39 @@ Commandes Ardu2 -> Rasp
 volatile int fd_A1;
 volatile int fd_A2;
 
-//Variables de réception série
+/*
+Les infos reçues sur la liaison série sont stockées dans une liste chainée globale, accessible par n'importe quelle fonction.
+On est d'accord, c'est dla merde un peu
+Faudra revoir ça
+*/
 
+//Variables de réception série
 typedef struct sbuffer
 {
     int available;      // Nombre de commandes en stock
-	Liste_chainee Lmsgs; //faire une liste chainee plutot
+	Liste_chainee Lmsgs; //fListe chainée de messages
 } Sbuffer;
 
 Sbuffer Serial_buffer;
+
+
 
 ////
 // Interruption série: récupération du caractère
 ////
 
+/*
+Ces fonctions s'executent lors de la réception d'un caractère sur la réception d'un messages de l'ardu 1 ou 2.
+Chaque message se termmine par '\n'
+On enregistre la somme des caractères du message reçu (manipuler des stings ça broie les glaouis)
+*/
 void RX1()
 {
 	printf("RX1 IT\n");
     int cmd=0;
     char c=0;
     int i=0;
+    //On attend d'avoir des données reçues (sans cette boucle, ça déconne)
     while(serialDataAvail(fd_A1)<1){}
     while(c!='\n')
     {
@@ -86,9 +98,8 @@ void RX1()
         if (c!='\n')
             cmd+=c;
     }
-    printf("sum success: %d\n",cmd);
+    //printf("sum success: %d\n",cmd);
     ajout_tete(&(Serial_buffer.Lmsgs),cmd);
-    //strcpy(Serial_buffer.Lmsgs->msg,received);
     Serial_buffer.available+=1;
 }
 
@@ -107,9 +118,12 @@ void RX2()
     }
     
     ajout_tete(&(Serial_buffer.Lmsgs),cmd);
-    //strcpy(Serial_buffer.Lmsgs->msg,received);
     Serial_buffer.available+=1;
 }
+
+////
+// Envoi et réception de données en liaison série
+////
 
 // Fonction d'envoi d'une flottante sur le port série spécifié
 void serialPutfloat(int fd, float f)
@@ -124,7 +138,6 @@ void serialPutfloat(int fd, float f)
 		delay(1);
 	}
 }
-
 
 
 // Fonction d'envoi d'une string terminée par \n sur le port spécifié
@@ -167,6 +180,15 @@ float serialGetfloat(int fd)
 }
 
 
+////
+// Ouverture et paramétrage des liaisons séries
+////
+
+/*
+Plusieurs Arduinos sont connectées à la Raspbe, il faut donc pouvoir les reconnaitre. Chacune possède un identifiant ('1' ou '2'),
+Qui peut lui être demandé en envoyant la commande 'I'.
+*/
+
 //Demande de l'ID de l'Arduino
 int Ardu_ID(int fd)
 {
@@ -185,31 +207,30 @@ int Connect_Ardus(int baudrate)
 	int fd_temp;
 	int N_ardus = 0;
 	int i = 0;
-    //Tant que les deux arduinos ne sont pas connectées  
-    //On teste différents ports Série
+    //On teste plusieurs ports série (/dev/ttyACM{O|1|2|..}) jusqu'à ce qu'on trouve les 2 arduinos (ou qu'on ait fait 5 tentatives)
 	while(N_ardus<2 && i<5)
 	{
         //Chemin du port Série i
 		sprintf(path,"/dev/ttyACM%d",i);
-		//printf("Test Path: %s\n",path);
-        //Test d'ouverture du port série
+        //Test d'ouverture du port série (le fd récupéré est "l'identifiant" de la LIASON SERIE, nécessaire pour communiquer par la suite)
 		fd_temp = serialOpen(path,baudrate);
         //Si ce Port est connecté
 		if (fd_temp>0)
 		{
-            //On attend que l'Arduino s'initialise
-			delay(3000);
-			//printf("fd_temp: %d\n",fd_temp);
-            // On demance l'ID de l'arduino connectée
+            //L'arduino Reset automatiquement, on attend qu'elle soit opérationelle
+			delay(2000);
+            // On demandee l'ID de l'arduino connectée
 			ID = Ardu_ID(fd_temp);
 			if (ID == '1')
 			{
+                //on attribue le fd récupéré à l'ouverture du port au fd qui sera utilisé pour l'arduino 1
 				fd_A1 = fd_temp;
 				N_ardus++;
 				printf("	Arduino 1 connected !\tfd: %d\n",fd_A1);
 			}
 			else if (ID == '2')
 			{
+                //on attribue le fd récupéré à l'ouverture du port au fd qui sera utilisé pour l'arduino 2
 				fd_A2 = fd_temp;
 				N_ardus++;
 				printf("	Arduino 2 connected !\tfd: %d\n",fd_A2);
@@ -218,11 +239,17 @@ int Connect_Ardus(int baudrate)
 		i++;
 	}
     
-    //Configuration du buffer série maison
+    //Configuration du buffer série maison (Oui bof bof)
     Serial_buffer.available=0;
     Serial_buffer.Lmsgs=NULL;
     
-    //configuration des interruptions série (voir si on fait pas de la scrutation plutot)
+    /*
+    Afin de pouvoir recevoir un message série à n'immporte quel moment, on lance les fonctions RX1 et RX2
+    sur des interruptions des pins PINIT1 et PINIT2 (voir #defines). Les arduinos génèrent donc un front montant 
+    sur ces pins lorsqu'ils envoient des messages série.
+    */
+
+    //configuration des interruptions série
 	int IT_set=2;
 	if (wiringPiISR(PINIT1, INT_EDGE_RISING, &RX1)<0){printf("Unable to setup interruption\n");IT_set-=1;}
 	else{printf("Interrupt setup RX1\n");}
@@ -242,11 +269,20 @@ int Connect_Ardus(int baudrate)
 }
 
 
+////
+// Demande de déplacement à l'arduino 1
+////
 
-//  prévoir un timeout !!! 
-//  retourne 2 si le déplacement est terminé
-//  retourne 1 si le robot est bloqué
-//  retourne 0 si le robot a rencontré un obstacle
+/*
+    Demande de déplacement du robot en distance ou en angle:
+    La fonction retourne:
+        3 si le déplacement est terminé
+        2 si le robot n'a pas envoyé de réponse avant un certain temps  //Pas encore codé
+        1 si le robot est bloqué
+        0 si le robot a rencontré un obstacle
+
+*/
+
 int dep_distance(float cmd, float speed, int fd)
 {
 	serialPutstringln(fd,"distance",8);
@@ -261,7 +297,7 @@ int dep_distance(float cmd, float speed, int fd)
         {
             if(tmp->msg==SUMSUCCESS)
             {
-                sup_tete(&tmp);Serial_buffer.available--; result = 2;
+                sup_tete(&tmp);Serial_buffer.available--; result = 3;
             }
             else if(tmp->msg==SUMBLOQUE)
             {
@@ -317,17 +353,20 @@ int dep_angle(float cmd, float speed, int fd)
 	return result;
 }
 
+//Demande au robot de s'arreter
 int dep_stop(int fd)
 {
     serialPutstringln(fd,"stop",4);
 }
 
+//Donne les capteurs à activer ou non
 void set_capteurs(unsigned char capt, int fd)
 {
 	serialPutstringln(fd,"capteurs",8);
 	serialPutchar(fd,capt);
 }
 
+//Bouger la pince
 void move_pince(int pos[8], int fd)
 {
 	int i;
