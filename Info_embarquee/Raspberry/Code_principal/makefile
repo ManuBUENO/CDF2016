@@ -1,4 +1,4 @@
-all: CodeCDF
+all: clean CodeCDF Pince
 
 Pince: listechaine.o arduinoserial.o pince.o
 	gcc -o Pince pince.o arduinoserial.o listechaine.o -Wall -lm -lwiringPi
@@ -17,6 +17,9 @@ arduinoserial.o: arduinoserial.c listechaine.h listechaine.o
 
 listechaine.o: listechaine.c
 	gcc -o listechaine.o -c listechaine.c
+
+pince.o:
+	gcc -o pince.o -c pince.c
 
 clean:
 	rm -rf *.o
