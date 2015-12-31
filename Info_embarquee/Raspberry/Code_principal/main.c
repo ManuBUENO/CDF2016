@@ -97,6 +97,8 @@ Complation: avec le makefile (commande make)
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
+
+
 #include <strings.h>
 
 // WiringPi
@@ -307,20 +309,26 @@ float calcul_distance(float Xdest, float Ydest)
 
 
 
+
 ////
 // Main function
 ////
 
 int main(void)
-{
-	//LEDs: Init, Ready, Running
-	//Allumage de la led d'état Init: Le programme a été lancé, le système s'initialise
-	digitalWrite(PINLEDINIT,HIGH);
+{	
 
 	//---------------- Configuration WiringPi
 
 	if (wiringPiSetup()<0){printf("Unable to setup wiringPi\n");exit(1);}
 	else{printf("Wiring setup\n");}
+
+	//Allumage de la led d'état Init: Le programme a été lancé, le système s'initialise
+	pinMode(PINLEDINIT,1);
+	pinMode(PINLEDREADY,1);
+	pinMode(PINLEDRUNNING,1);
+	digitalWrite(PINLEDINIT,HIGH);
+	digitalWrite(PINLEDREADY,LOW);
+	digitalWrite(PINLEDRUNNING,LOW);
 
 	//---------------- Configuration Interuptions
 
@@ -343,12 +351,11 @@ int main(void)
     //Fonction dans la librairie Libodo.c
     //A améliorer pour initialiser les variables X, Y et angle
 
-	//config_odo(PINGA, PINGB, PINDA, PINDB);
+	config_odo(PINGA, PINGB, PINDA, PINDB);
 
 
 	
 		
-
 	//---------------- Configuration parcours
 
     //liste_chainee etape=NULL;
@@ -381,12 +388,12 @@ int main(void)
 	//Tq pas d'interruption de départ
 	while(activate==0){delay(1);}
 	//Allumage de la led d'état RUNNING: Le parcours est en cours
-	digitalWrite(PINLEDREADY,HIGH);
+	digitalWrite(PINLEDRUNNING,HIGH);
 	printf("C'est parti !\n");
 	activate=1;
 
 	//---------------- Boucle principale
-	while ((activate==1) && (num<=N_steps))
+	while ((activate==1) && (num<N_steps))
 	{
 		printf("Etape %d\n",num);
 		printf("mode:%c\n",step[num].mode);
@@ -396,7 +403,7 @@ int main(void)
 			//aller en X,Y
 			case '0':
                 i=0;reponse=-1;
-                while(i<3 && reponse!=2)
+                while(i<3 && reponse!=3)
                 {
                 	//set_capteurs(step[num].capteurs,fd_A2);
                 	printf("Tentative angle %d\n",i);
@@ -411,7 +418,7 @@ int main(void)
                     i++;
                 }
                 i=0;reponse=-1;
-                while(i<3 && reponse!=2)
+                while(i<3 && reponse!=3)
                 {
                 	//set_capteurs(step[num].capteurs,fd_A2);
                 	printf("Tentative dist %d\n",i);
@@ -429,7 +436,7 @@ int main(void)
             //Déplacement angulaire
 			case '1':
                 i=0;reponse=-1;
-                while(i<3 && reponse!=2)
+                while(i<3 && reponse!=3)
                 {
                 	//set_capteurs(step[num].capteurs,fd_A2);
                     reponse = dep_angle(step[num].angle-Oangle,step[num].Va,fd_A1);
