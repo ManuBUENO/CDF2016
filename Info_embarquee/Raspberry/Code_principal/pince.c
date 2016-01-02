@@ -2,7 +2,7 @@
 /*-----------------ROBOTECH LILLE-------------------
 Ce programme permet de récupérer les angles des servomoteurs du robot et de les stocker dans un fichier de son choix.
 Le fichier comportera 8 lignes avec l'ID du servomoteur et son angle
-Complation avec le makefile (commande make pince)
+Complation avec le makefile (commande make)
 */
 
 

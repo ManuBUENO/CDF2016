@@ -283,7 +283,9 @@ int Connect_Ardus(int baudrate)
 
 */
 
-int dep_distance(float cmd, float speed, int fd)
+int dep_distance(float cmd, float speed, int 
+
+fd)
 {
 	serialPutstringln(fd,"distance",8);
 	serialPutfloat(fd,cmd);
@@ -332,7 +334,7 @@ int dep_angle(float cmd, float speed, int fd)
         {
             if(tmp->msg==SUMSUCCESS)
             {
-                sup_tete(&tmp);Serial_buffer.available--; result = 2;
+                sup_tete(&tmp);Serial_buffer.available--; result = 3;
             }
             else if(tmp->msg==SUMBLOQUE)
             {
