@@ -59,7 +59,7 @@ volatile int fd_A2;
 
 /*
 Les infos reçues sur la liaison série sont stockées dans une liste chainée globale, accessible par n'importe quelle fonction.
-On est d'accord, c'est dla merde un peu
+On est d'accord, c'est dla merde un peu, mais dans un système + complexe ça peut etre sympa
 Faudra revoir ça
 */
 
@@ -79,9 +79,9 @@ Sbuffer Serial_buffer;
 ////
 
 /*
-Ces fonctions s'executent lors de la réception d'un caractère sur la réception d'un messages de l'ardu 1 ou 2.
+Ces fonctions s'executent lors de la réception d'un messages de l'ardu 1 ou 2.
 Chaque message se termmine par '\n'
-On enregistre la somme des caractères du message reçu (manipuler des stings ça broie les glaouis)
+On identifie un message par la somme des caractères reçus (manipuler des stings ça broie les glaouis)
 */
 void RX1()
 {
@@ -185,8 +185,8 @@ float serialGetfloat(int fd)
 ////
 
 /*
-Plusieurs Arduinos sont connectées à la Raspbe, il faut donc pouvoir les reconnaitre. Chacune possède un identifiant ('1' ou '2'),
-Qui peut lui être demandé en envoyant la commande 'I'.
+Plusieurs Arduinos sont connectées à la Raspbe, il faut donc pouvoir les différencier. Chacune possède un identifiant ('1' ou '2'),
+Qui peut lui être demandé en envoyant la commande "I\n".
 */
 
 //Demande de l'ID de l'Arduino
@@ -207,7 +207,7 @@ int Connect_Ardus(int baudrate)
 	int fd_temp;
 	int N_ardus = 0;
 	int i = 0;
-    //On teste plusieurs ports série (/dev/ttyACM{O|1|2|..}) jusqu'à ce qu'on trouve les 2 arduinos (ou qu'on ait fait 5 tentatives)
+    //On teste plusieurs ports série (/dev/ttyACM{O|1|2|..}) jusqu'à ce qu'on trouve les 2 arduinos (ou qu'on ait fait 5 tentatives infructueuses)
 	while(N_ardus<2 && i<5)
 	{
         //Chemin du port Série i
@@ -223,14 +223,14 @@ int Connect_Ardus(int baudrate)
 			ID = Ardu_ID(fd_temp);
 			if (ID == '1')
 			{
-                //on attribue le fd récupéré à l'ouverture du port au fd qui sera utilisé pour l'arduino 1
+                //on attribue le fd récupéré lors de l'ouverture du port au fd qui sera utilisé pour l'arduino 1
 				fd_A1 = fd_temp;
 				N_ardus++;
 				printf("	Arduino 1 connected !\tfd: %d\n",fd_A1);
 			}
 			else if (ID == '2')
 			{
-                //on attribue le fd récupéré à l'ouverture du port au fd qui sera utilisé pour l'arduino 2
+                //on attribue le fd récupéré lors de l'ouverture du port au fd qui sera utilisé pour l'arduino 2
 				fd_A2 = fd_temp;
 				N_ardus++;
 				printf("	Arduino 2 connected !\tfd: %d\n",fd_A2);
@@ -283,9 +283,7 @@ int Connect_Ardus(int baudrate)
 
 */
 
-int dep_distance(float cmd, float speed, int 
-
-fd)
+int dep_distance(float cmd, float speed, int fd)
 {
 	serialPutstringln(fd,"distance",8);
 	serialPutfloat(fd,cmd);
@@ -367,12 +365,12 @@ void set_capteurs(unsigned char capt, int fd)
 	serialPutstringln(fd,"capteurs",8);
 	serialPutchar(fd,capt);
 }
-
 //Bouger la pince
+
 void move_pince(int pos[8], int fd)
 {
 	int i;
-    serialPutstringln(fd,"servos",5);
+    serialPutstringln(fd,"servos",6);
 	for (i=0;i<8;i++)
 	{
 		serialPutfloat(fd,pos[i]);

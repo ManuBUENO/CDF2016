@@ -35,7 +35,7 @@ A faire:
     - On init Y=0 (fct "reset_Y();")
 - Lancement du programme au démarrage de la raspberry 															A faire
 - Gérer les modulos d'angles																					A faire
-- Définir des leds d'état (Programme lancé, Initialisations faites, Parcours en cours, Parcours terminé, ...)	A faire
+- Définir des leds d'état (Programme lancé, Initialisations faites, Parcours en cours, Parcours terminé, ...)	OK
 - Développer une interface utilisateur (écran tactile ?, carte elec ? ...)                                      A faire
 - Améliorer la gestion série                                                                                    En cours
 
@@ -53,6 +53,10 @@ Codeuse droite:
 LED Init: GPIO 21
 LED Ready: GPIO 22
 LED Running: GPIO 23
+
+Interrupt depart: GPIO 29
+Interrupt select: GPIO 24
+Interrupt valid : GPIO 25
 
 
 
@@ -85,7 +89,8 @@ https://projects.drogon.net/raspberry-pi/wiringpi/
 
 Usefull for GPIOs, Interrupt, Serial, Timing
 
-Complation: avec le makefile (commande make)
+Complation: sudo make
+Lancement:  sudo ./Code_CDF
 */
 
 
@@ -135,17 +140,17 @@ Complation: avec le makefile (commande make)
 
 
 ////
-// Volatile vars
+// Global vars
 ////
 
 
-volatile int activate;
-volatile int N_steps;
+int activate;
+int N_steps;
 
 
 
 ////
-// Decalration structure etape
+// Declaration structure etape
 ////
 
 // Cette structure contient tous les paramètres d'une étape
@@ -168,6 +173,7 @@ typedef struct etape
 	int Vd;					//(mm/s)
 	unsigned char capteurs;
 	int servos[8];				//(deg)
+	int ID_servos[8];
 	int wait;					//(ms)
 } Etape;
 
@@ -201,11 +207,12 @@ void lecture_parcours()
 	char path[20];
 	//sprintf(path,"parcours%d.txt",parcours);
 	
-	FILE* fd = fopen("parcours0.txt","r");
+	FILE* fd = fopen("parcours1.txt","r");
 	if (fd<0){printf("unable to open file\n");exit(-1);}
 	int i=0,j;
 	char c,a,b,d; //
-	fscanf(fd,"%c ",&c);	
+	fscanf(fd,"%c ",&c);
+	//Tant qu'on n'est pas en fin de fichier
 	while (c!=255)
 	{
 		//printf("\nboucle %d\n",i);
@@ -219,13 +226,29 @@ void lecture_parcours()
 			fscanf(fd,"%f %f %c\n",&(step[i].angle),&(step[i].Va), &(step[i].capteurs));
 			break;
 			case '2':
-			for (j=0;j<9;j++)
+			for (j=0;j<8;j++)
 			{
 				fscanf(fd,"%d ",&(step[i].servos[j]));
 			}
-			fscanf(fd,"%d\n", &(step[i].capteurs));
+			fscanf(fd,"%c\n", &(step[i].capteurs));
 			break;
-			case'3':
+			case '3':
+			fscanf(fd,"%s ",path);
+			FILE* fd2=fopen(path,"r");
+			printf("path:%s\n",path);
+			if (fd2<0){printf("unable to open servo file %s\n",path);exit(-1);}
+			else
+			{
+				for (j=0;j<8;j++)
+				{
+					printf("%d\n",j);
+					fscanf(fd2,"%d %d\n",&(step[i].ID_servos[j]),&(step[i].servos[j]));
+				}
+			}
+			fclose(fd2);
+			fscanf(fd,"%c\n", &(step[i].capteurs));
+			break;
+			case'4':
 			fscanf(fd,"%d %c\n",&(step[i].wait),&(step[i].capteurs));
 			break;
 		}
@@ -235,6 +258,7 @@ void lecture_parcours()
 		//delay(100);
 	}
 	N_steps = i;
+	fclose(fd);
 	//printf("N_steps: %d\n");
 }
 
@@ -244,7 +268,7 @@ void debug_parcours()
 	int i,j;
 	for (i=0;i<N_steps;i++)
 	{
-		printf("Etape n°: %d",i);
+		printf("Etape %d",i);
 		printf("\tMode %c\n",step[i].mode);
 		switch(step[i].mode)
 		{
@@ -255,13 +279,20 @@ void debug_parcours()
 			printf("\tangle:%d\tVa:%d\tcapteurs:%c\n",step[i].angle,step[i].Va, step[i].capteurs);
 			break;
 			case '2':
-			for (j=0;j<9;j++)
+			for (j=0;j<8;j++)
 			{
 				printf("\t%d ",step[i].servos[j]);
 			}
 			printf("\ncapteurs:%c\n", step[i].capteurs);
 			break;
-			case'3':
+			case '3':
+			for (j=0;j<8;j++)
+			{
+				printf("\t%d ",step[i].servos[j]);
+			}
+			printf("\ncapteurs:%c\n", step[i].capteurs);
+			break;
+			case'4':
 			printf("\twait:%d\tcapteurs:%c\n",step[i].wait,step[i].capteurs);
 			break;
 		}
@@ -341,9 +372,7 @@ int main(void)
 
 	//---------------- Configuration série
     //Connexion des arudinos
-
-	if (Connect_Ardus(BAUDRATE) < 0)
-		printf("Unable to connect to Arduinos\n");
+	printf("Able to connect %d Arduino(s)\n",Connect_Ardus(BAUDRATE));
 	
 
 
@@ -351,16 +380,13 @@ int main(void)
     //Fonction dans la librairie Libodo.c
     //A améliorer pour initialiser les variables X, Y et angle
 
-	config_odo(PINGA, PINGB, PINDA, PINDB);
+	//config_odo(PINGA, PINGB, PINDA, PINDB);
 
 
-	
-		
 	//---------------- Configuration parcours
-
-    //liste_chainee etape=NULL;
 	//fonction de lecture dans un fichier à faire
 
+	printf("Lecture fichier...\n");
 	lecture_parcours();
 	//printf("\nLu\n");
 	debug_parcours();
@@ -382,21 +408,24 @@ int main(void)
 		delay(100);
 	}
 	*/
+	
 	//Allumage de la led d'état READY: Le système est initialisé sans erreurs
 	digitalWrite(PINLEDREADY,HIGH);
-	printf("Attente du signal de dépat...\n");
+	printf("Attente du signal de départ...\n");
 	//Tq pas d'interruption de départ
-	while(activate==0){delay(1);}
+	//while(activate==0){}
+	activate=1;
+	int trash;
+	scanf("%d",&trash);
 	//Allumage de la led d'état RUNNING: Le parcours est en cours
 	digitalWrite(PINLEDRUNNING,HIGH);
 	printf("C'est parti !\n");
-	activate=1;
 
 	//---------------- Boucle principale
 	while ((activate==1) && (num<N_steps))
 	{
-		printf("Etape %d\n",num);
-		printf("mode:%c\n",step[num].mode);
+		printf("\nEtape %d\n",num);
+		printf("\tmode:%c\n",step[num].mode);
 
 		switch (step[num].mode)
 		{
@@ -406,10 +435,10 @@ int main(void)
                 while(i<3 && reponse!=3)
                 {
                 	//set_capteurs(step[num].capteurs,fd_A2);
-                	printf("Tentative angle %d\n",i);
+                	printf("\tTentative angle %d\n",i);
                     reponse = dep_angle(calcul_angle(step[num].X,step[num].Y),step[num].Va,fd_A1);
                     // Est ce qu'on considère les obstacles en déplacement angulaire ?
-                    printf("Reponse: %d\n\n",reponse);
+                    printf("\tReponse: %d\n\n",reponse);
                     if (reponse==0)
                     {
                         dep_stop(fd_A1);
@@ -421,9 +450,9 @@ int main(void)
                 while(i<3 && reponse!=3)
                 {
                 	//set_capteurs(step[num].capteurs,fd_A2);
-                	printf("Tentative dist %d\n",i);
+                	printf("\tTentative dist %d\n",i);
                     reponse = dep_distance(calcul_distance(step[num].X,step[num].Y),step[num].Vd,fd_A1);
-                    printf("Reponse: %d\n\n",reponse);
+                    printf("\tReponse: %d\n\n",reponse);
                     if (reponse==0)
                     {
                         dep_stop(fd_A1);
@@ -453,9 +482,12 @@ int main(void)
 			case '2':
 				move_pince(step[num].servos,fd_A2);
 			break;
-            
-            //Attendre un delay
 			case '3':
+				move_pince(step[num].servos,fd_A2);
+			break;
+
+            //Attendre un delay
+			case '4':
 				delay(step[num].wait);
 			break;
 		}

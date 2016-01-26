@@ -62,12 +62,12 @@ int main(void)
         //Si ce Port est connecté
 		if (se_temp>0)
 		{
-            //L'arduino Reset automatiquement, on attend qu'elle soit opérationelle
+            //L'arduino Reset automatiquement, on attend donc qu'elle soit opérationelle
 			delay(2000);
-            // On demandee l'ID de l'arduino connectée
+            // On demande l'ID de l'arduino connectée
 			if (Ardu_ID(se_temp) == '2')
 			{
-                //on attribue le se récupéré à l'ouverture du port au fd qui servira à la communiquer avec l'arduino
+                //on attribue le se récupéré lors de l'ouverture du port au fd qui servira à communiquer avec l'arduino
 				se = se_temp;
 				printf("	Arduino 2 connected !\tse: %d\n",se);
 			}
@@ -86,6 +86,7 @@ int main(void)
 		int ID = serialGetchar(se);
 		int position=serialGetfloat(se);
 		fprintf(fd,"%d %d\n",ID,position);
+		printf("%d %d\n",ID,position);
 	}
 	
 	serialClose(se);

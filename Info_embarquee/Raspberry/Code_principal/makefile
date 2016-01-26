@@ -2,9 +2,11 @@ all: clean CodeCDF Pince
 
 Pince: listechaine.o arduinoserial.o pince.o
 	gcc -o Pince pince.o arduinoserial.o listechaine.o -Wall -lm -lwiringPi
+#	chmod u+s ./Pince
 
 CodeCDF: libodo.o listechaine.o arduinoserial.o main.o 
 	gcc -o CodeCDF main.o libodo.o arduinoserial.o listechaine.o -Wall -lm -lwiringPi
+#	chmod u+s ./CodeCDF
 
 libodo.o: libodo.c
 	gcc -o libodo.o -c libodo.c 
@@ -18,7 +20,7 @@ arduinoserial.o: arduinoserial.c listechaine.h listechaine.o
 listechaine.o: listechaine.c
 	gcc -o listechaine.o -c listechaine.c
 
-pince.o:
+pince.o: pince.c
 	gcc -o pince.o -c pince.c
 
 clean:
